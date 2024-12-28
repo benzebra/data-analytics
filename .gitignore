@@ -1,2 +1,6 @@
 *.DS_Store
 /.env/
+best_knn_lda.pkl
+best_knn_pca.pkl
+best_knn.pkl
+err_arr.csv
