@@ -5,3 +5,12 @@ best_knn_pca.pkl
 best_knn.pkl
 err_arr.csv
 knn.pkl
+knn_lda.pkl
+knn_pca.pkl
+knn_std.pkl
+knn_lda_red.pkl
+knn_pca_red.pkl
+knn_std_red.pkl
+knn_lda_1.pkl
+knn_pca_1.pkl
+knn_std_1.pkl
