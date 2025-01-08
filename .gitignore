@@ -14,3 +14,7 @@ knn_std_red.pkl
 knn_lda_1.pkl
 knn_pca_1.pkl
 knn_std_1.pkl
+arr_y_pred_val.csv
+knn_cleaning_final.pkl
+y_pred_val.csv
+y_pred.csv
