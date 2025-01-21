@@ -1,3 +1,8 @@
 /.env/
 /daenv/
 .DS_Store
+/.venv/
+/TRAIN/runs/
+rf.save
+svc.save
+knn.save
