@@ -18,3 +18,4 @@ arr_y_pred_val.csv
 knn_cleaning_final.pkl
 y_pred_val.csv
 y_pred.csv
+res.txt
