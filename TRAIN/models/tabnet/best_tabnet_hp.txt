@@ -1,0 +1,1 @@
+num_epochs=10, batch_size=256, patience=10, n_d=16, n_indipendent=1, n_shared=8, n_steps=9, gamma=1.0, epsilon=1e-15, lr=0.01, pretraining_ratio=0.5, momentum=0.99

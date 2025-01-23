@@ -1,0 +1,1 @@
+Best hyperparameters: epochs=20, batch_size=512, patience=10, dim_embedding=32, num_heads=8, num_layers=16, lr=0.001
