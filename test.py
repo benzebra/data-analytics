@@ -4,7 +4,7 @@ import pickle
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
 # import pandas
 import pandas as pd
-
+#import numpy
 import numpy as np
 
 #import label encoder and ordinal encoder
@@ -22,8 +22,8 @@ def load(clfName):
     if (clfName == "knn"):
         clf = pickle.load(open("knn.save", 'rb'))
         return clf
-    elif (clfName == "svr"):
-        clf = pickle.load(open("svr.save", 'rb'))
+    elif (clfName == "svm"):
+        clf = pickle.load(open("svm.save", 'rb'))
         return clf
     elif (clfName == "rf"):
         clf = pickle.load(open("rf.save", 'rb'))
@@ -42,13 +42,14 @@ def load(clfName):
     
 #preprocess the dataset based on the classifier to use
 def preprocess(df, clfName):
-    #data cleaning
     
+    #drop column label
+    df = df.drop(columns=["label"])
+    
+    #data cleaning
     df["src_bytes"] = df["src_bytes"].replace("0.0.0.0", np.nan).astype(float)
     mean_src_bytes = df["src_bytes"].mean()
     df["src_bytes"] = df["src_bytes"].fillna(mean_src_bytes)
-    
-    
     
     # casting
     df.astype({'src_bytes': 'int64', 'ts': 'datetime64[ms]', 'dns_AA': 'bool', 'dns_RD': 'bool', 'dns_RA': 'bool', 'dns_rejected': 'bool', 'ssl_resumed': 'bool', 'ssl_established': 'bool', 'weird_notice': 'bool'}).dtypes
@@ -67,12 +68,14 @@ def preprocess(df, clfName):
     le = LabelEncoder()
     y = le.fit_transform(y)
     
+    # load the scaler
+    scaler = pickle.load(open("scaler.save", 'rb'))
     
+    # apply the scaler to the dataset
+    X = scaler.transform(X)
+
+    # clfs that need PCA
     if ((clfName == "ff") or (clfName == "tb") or (clfName == "tf") or (clfName == "rf")):
-        # load the scaler
-        scaler = pickle.load(open("scaler.save", 'rb'))
-        # apply the scaler to the dataset
-        X =scaler.transform(X)
         # load the pca
         pca = pickle.load(open("pca.save", 'rb')) 
         # apply the pca to the dataset
@@ -82,23 +85,14 @@ def preprocess(df, clfName):
         # return the new dataset            
         return dfNew
     
+    #clfs that just use Standard Scaling
     elif (clfName == "knn"):
-        # load the scaler
-        scaler = pickle.load(open("scaler.save", 'rb'))
-        # apply the scaler to the dataset
-        X = pd.DataFrame(scaler.transform(X))
-        # load the lda
-        dfNew = pd.concat([X, y], axis = 1)
-        # return the new dataset
-        return dfNew
+        return pd.concat([X, y], axis = 1)
     
-    elif (clfName == "svr"):
-        # load the scaler
-        scaler = pickle.load(open("scaler.save", 'rb'))
-        # apply the scaler to the dataset
-        X = pd.DataFrame(scaler.transform(X))
+    #clfs that use LDA
+    elif (clfName == "svm"):
         # load the lda
-        lda = pickle.load(open("pca.save", 'rb'))
+        lda = pickle.load(open("lda.save", 'rb'))
         # apply the lda to the dataset
         X = pd.DataFrame(lda.transform(X,y))
         # concatenate X and y
@@ -106,11 +100,14 @@ def preprocess(df, clfName):
         # return the new dataset
         return dfNew
     
+    #wrong clf name
+    else:
+        return None
     
-def predict(df, clfName, clf):
+def predict(df, clf):
     # divide dataset in X and y
     y = df["type"]
-    X = df.drop(["label,type"])
+    X = df.drop(columns=["type"])
     
     # predict the dataset
     y_pred = clf.predict(X)
@@ -125,7 +122,7 @@ def predict(df, clfName, clf):
     f1 = f1_score(y, y_pred, average='weighted')
     
     # create the performance object
-    perf= {"accuracy": accuracy, "balanced_accuracy": balanced_accuracy, "f1": f1}
+    perf = {"accuracy": accuracy, "balanced_accuracy": balanced_accuracy, "f1": f1}
     
     # return the performance object
     return perf
