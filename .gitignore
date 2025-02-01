@@ -19,3 +19,5 @@ knn_cleaning_final.pkl
 y_pred_val.csv
 y_pred.csv
 res.txt
+train_save_models.ipynb
+/saves/
