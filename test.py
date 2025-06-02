@@ -286,15 +286,6 @@ class FFNN(torch.nn.Module):
                     _, predictions = torch.max(outputs, 1)  # Get the class with the highest score
                 return predictions  # Return predictions as a PyTorch tensor
 
-
-
-
-
-
-
-
-
-
 #students codes
 SIMONE_ID = 1140193 
 FILIPPO_ID = 1130613
@@ -423,8 +414,8 @@ def predict(df, clf):
     print(type(df))
     if isinstance(df, pd.DataFrame):
         print("Data is a DataFrame")
-        X = df.iloc[:, :-1].values  # Ensure X contains all columns except the last one
-        y = df.iloc[:, -1].values   # Ensure y contains the last column
+        X = df.iloc[:, :-1].values  
+        y = df.iloc[:, -1].values
     elif isinstance(df, np.ndarray):
         print("Data is a Numpy Array")
         X = df[:, :-1]
@@ -443,8 +434,6 @@ def predict(df, clf):
     elif (isinstance(clf, TabNet)):
         print("Predicting with TabNet model")
         ypred = clf.predict(X)
-        
-        
     else: 
         print("Predicting with sklearn model")
         ypred = clf.predict(X)
