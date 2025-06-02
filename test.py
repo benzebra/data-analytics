@@ -21,7 +21,7 @@ from pytorch_tabnet.pretraining import TabNetPretrainer
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
-
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 def test_model(model, criterion, loader):
     model.eval()
     y_pred = torch.tensor([],requires_grad=True).to(device)
@@ -86,7 +86,7 @@ class TabNet(torch.nn.Module):
                                                 scheduler_params=scheduler_params,
                                                 mask_type=mask_type,
                                                 scheduler_fn=scheduler_fn,
-                                                device_name=device_name,
+                                                device_name=device,
                                                 output_dim=output_dim,
                                                 verbose=verbose)
             
@@ -128,7 +128,7 @@ class TabNet(torch.nn.Module):
                                     )
                 unsupervised_model = TabNetPretrainer(**tabnet_params)
                 return unsupervised_model
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 class TabTransformer(torch.nn.Module):
             def __init__(self, num_features, num_classes, dim_embedding=8, num_heads=2, num_layers=2):
                 super(TabTransformer, self).__init__()
@@ -440,7 +440,7 @@ def predict(df, clf):
     
     # Calculate metrics
     acc = accuracy_score(y, ypred)
-    bacc = balanced_accuracy_score(y, ypred)
+    bacc = float(balanced_accuracy_score(y, ypred))
     f1 = f1_score(y, ypred, average="weighted")
 
     return {"acc": acc, "bacc": bacc, "f1": f1}
