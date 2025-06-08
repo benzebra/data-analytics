@@ -6,3 +6,7 @@
 rf.save
 svc.save
 knn.save
+/venv/
+/TRAIN2/
+/models/
+/__pycache__/

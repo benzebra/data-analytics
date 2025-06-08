@@ -1,27 +1,40 @@
-#import pickle
-import pickle
-
-#import accuracy score, balanced accuracy score, f1 score
-from sklearn.decomposition import PCA
-from sklearn.discriminant_analysis import StandardScaler, LinearDiscriminantAnalysis
-from sklearn.metrics import accuracy_score, balanced_accuracy_score, f1_score
-import time
-# import pandas
 import pandas as pd
-
-#import numpy
 import numpy as np
-import copy
-#import label encoder and ordinal encoder
-from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
+import itertools, random, time, copy, pickle
 import torch
-from pytorch_tabnet.tab_model import TabNetClassifier
-from pytorch_tabnet.pretraining import TabNetPretrainer
-#import kneighbors classifier,random forest classifier, support vector machine classifier
-from sklearn.neighbors import KNeighborsClassifier
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.preprocessing import OrdinalEncoder, LabelEncoder, StandardScaler
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.decomposition import PCA
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+from sklearn.utils.class_weight import compute_class_weight
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, f1_score, balanced_accuracy_score, ConfusionMatrixDisplay
+
+from pytorch_tabnet.tab_model import TabNetClassifier, TabNetRegressor
+from pytorch_tabnet.pretraining import TabNetPretrainer
+
+
+SIMONE_ID = 1140193 
+FILIPPO_ID = 1130613
+
+PATH = "TRAIN/models"
+
+
+device = torch.device('cpu')
+if torch.cuda.is_available():
+    device = torch.device('cuda')
+elif torch.backends.mps.is_available():
+    device = torch.device('mps')
+
+
 def test_model(model, criterion, loader):
     model.eval()
     y_pred = torch.tensor([],requires_grad=True).to(device)
@@ -39,10 +52,8 @@ def test_model(model, criterion, loader):
 
     avg_loss = total_loss / len(loader)
     return avg_loss, y_pred.squeeze(), y_true.squeeze()
+
 class TabNet(torch.nn.Module):
-            '''
-            Wrapper class for TabNetClassifier
-            '''
             def __init__(self, n_d,
                         n_a,
                         n_steps,
@@ -226,6 +237,7 @@ class TabTransformer(torch.nn.Module):
                 print('\nTraining ended after {:.2f} seconds - Best val_loss: {:.6f}'.format(time.time() - start, best_val_loss))
 
                 return best_model, loss_history, val_loss_history
+
 class FFNN(torch.nn.Module):
             def __init__(self, input_size, output_size, hidden_size, dropout_prob=0, depth=1):
                 super(FFNN, self).__init__()
@@ -286,126 +298,104 @@ class FFNN(torch.nn.Module):
                     _, predictions = torch.max(outputs, 1)  # Get the class with the highest score
                 return predictions  # Return predictions as a PyTorch tensor
 
-#students codes
-SIMONE_ID = 1140193 
-FILIPPO_ID = 1130613
 
 #return name and code of students
 def getName():
-    return f"Rinaldi Simone: {SIMONE_ID} \n Filippo Brajucha: {FILIPPO_ID}"
+    return f"Filippo Brajucha: {FILIPPO_ID} \n Simone Rinaldi: {SIMONE_ID}"
 
 #load the model from the file
 def load(clfName):
     if (clfName == "knn"):
-        print("Loading KNN model")
-        clf: KNeighborsClassifier = pickle.load(open("TRAIN/models/knn/knn.pkl", 'rb'))
-        #print the model
-        print(clf)
+        clf: KNeighborsClassifier = pickle.load(open(f'{PATH}/knn/knn.pkl', 'rb'))
         return clf
+    
     elif (clfName == "svm"):
-        print("Loading SVM model")
-        clf: SVC = pickle.load(open("TRAIN/models/svm/svm.pkl", 'rb'))
+        clf: SVC = pickle.load(open(f'{PATH}/svm/svm.pkl', 'rb'))
         return clf
+    
     elif (clfName == "rf"):
-        print("Loading RF model")
-        clf: RandomForestClassifier = pickle.load(open("TRAIN/models/rf/rf.pkl", 'rb'))
+        clf: RandomForestClassifier = pickle.load(open(f'{PATH}/rf/rf.pkl', 'rb'))
         return clf
+    
     elif (clfName=="tf"):
-        print("Loading TF model")
-        clf: TabTransformer = pickle.load(open("TRAIN/models/tabtransf/tabtransformer.pkl", 'rb'))
+        clf: TabTransformer = pickle.load(open(f'{PATH}/tabtransf/tabtransformer.pkl', 'rb'))
         return clf
+    
     elif (clfName=="tb"):
-        print("Loading TB model")
-        clf: TabNet = pickle.load(open("TRAIN/models/tabnet/tabnet.pkl", 'rb'))
+        clf: TabNet = pickle.load(open(f'{PATH}/tabnet/tabnet.pkl', 'rb'))
         return clf
+    
     elif (clfName=="ff"):
-        print("Loading FF model")
-        clf: FFNN = pickle.load(open("TRAIN/models/ffnn/ffnn.pkl", 'rb'))
+        clf: FFNN = pickle.load(open(f'{PATH}/ffnn/ffnn.pkl', 'rb'))
         return clf
+    
     else:
         return None
     
 def preprocess(df: pd.DataFrame, clfName: str):
+    # 1, 2 e 3
     df = df.dropna()
-    if "label" in df.columns:
-        df = df.drop(columns=["label"])
-    if "type" not in df.columns:
-        raise KeyError("The column 'type' is not in the dataframe.")
-    
+
+    if 'label' in df.columns:
+        df = df.drop(columns=['label'])
+    if 'type' not in df.columns:
+        raise KeyError('"type" column is not in the dataframe')
 
     # 4
-    if "src_bytes" in df.columns:
-        df["src_bytes"] = df["src_bytes"].replace("0.0.0.0", np.nan).astype(float)
-        mean_src_bytes = df["src_bytes"].mean()
-        df["src_bytes"] = df["src_bytes"].fillna(mean_src_bytes)
+    if 'src_bytes' in df.columns:
+        df['src_bytes'] = df['src_bytes'].replace('0.0.0.0', np.nan).astype(float)
+        mean_src_bytes = df['src_bytes'].mean()
+        df['src_bytes'] = df['src_bytes'].fillna(mean_src_bytes)
 
     # 5
     df = df.astype({'src_bytes': 'int64', 'ts': 'datetime64[ms]', 'dns_AA': 'bool', 'dns_RD': 'bool', 'dns_RA': 'bool', 'dns_rejected': 'bool', 'ssl_resumed': 'bool', 'ssl_established': 'bool'})
 
-    # Filter object columns from df and then replace all values equal to "-" with mode
+    # special characters replacement
     cat_cols = df.select_dtypes(include=['object']).columns
     bool_cols = df.select_dtypes(include=['bool']).columns
-
-    # replace values equal to - with mode for object columns
-    for col in cat_cols:
-        df[col] = df[col].replace("-", df[col].mode()[0])
-        
-    # replace values equal to - with mode for bool columns
-    for col in bool_cols:
-        df[col] = df[col].replace("-", df[col].mode()[0])
-
-    # replace values equal to - with mean just for numerical values
     num_cols = df.select_dtypes(include=['float64', 'int64']).columns
+    date_cols = df.select_dtypes(include=['datetime64']).columns
+
+    mode_cols = (df.select_dtypes(include=['object', 'bool']).columns)
+    mode_cols.append(df['ts'].index)
+    for col in mode_cols:
+        df[col] = df[col].replace('-', df[col].mode()[0])
+
     for col in num_cols:
-        df[col] = df[col].replace("-", df[col].mean())
+        df[col] = df[col].replace('-', df[col].mean())
 
-    #do it for ts column
-    df["ts"] = df["ts"].replace("-", df["ts"].mode()[0])
-
-    #define X and y
-    X = df.drop(columns=["type"])
-    y = df["type"]
+    X = df.drop(columns=['type'])
+    y = df['type']
 
     # Ordinal Encoding for object and bool columns
-    oe_cat: OrdinalEncoder = pickle.load(open('TRAIN/models/preprocessing/ordinal_encoder_cat.pkl', 'rb'))
-    oe_bool: OrdinalEncoder = pickle.load(open('TRAIN/models/preprocessing/ordinal_encoder_bool.pkl', 'rb'))
-    #drop type from cat_cols
-    cat_cols = cat_cols.drop("type")
+    oe_cat: OrdinalEncoder = pickle.load(open(f'{PATH}/preprocessing/ordinal_encoder_cat.pkl', 'rb'))
+    oe_bool: OrdinalEncoder = pickle.load(open(f'{PATH}/preprocessing/ordinal_encoder_bool.pkl', 'rb'))
+    oe_ts: OrdinalEncoder = pickle.load(open(f'{PATH}/preprocessing/ordinal_encoder_ts.pkl', 'rb'))
 
-    #apply ordinal encoder for every cat_columns and bool_columns separately
+    cat_cols = cat_cols.drop('type')
     X[cat_cols] = oe_cat.transform(X[cat_cols])
     X[bool_cols] = oe_bool.transform(X[bool_cols])
+    X['ts'] = oe_ts.transform(X['ts'].values.reshape(-1, 1))
 
-    # Ordinal Encoding for ts column
-    oe_ts : OrdinalEncoder = pickle.load(open('TRAIN/models/preprocessing/ordinal_encoder_ts.pkl', 'rb'))
-    X["ts"] = oe_ts.transform(X[["ts"]])
-        
-    # Filter bool columns and do one hot encoding
-    bool_cols = X.select_dtypes(include=['bool']).columns
     X = pd.get_dummies(X, columns=bool_cols)
 
     # Label Encoding
-    le: LabelEncoder = pickle.load(open('TRAIN/models/preprocessing/label_encoder.pkl', 'rb'))
+    le: LabelEncoder = pickle.load(open(f'{PATH}/preprocessing/label_encoder.pkl', 'rb'))
     y = le.transform(y)
     
-    if clfName == "tb" or clfName == "knn":
-        std : StandardScaler = pickle.load(open('TRAIN/models/preprocessing/scaler.pkl', 'rb'))
-        X = std.transform(X)
-        
-    elif clfName == "tf" or clfName == "rf" or clfName == "svm" or clfName == "ff":
-        #apply pca loading
-        std : StandardScaler = pickle.load(open('TRAIN/models/preprocessing/scaler.pkl', 'rb'))
-        X = std.transform(X)
-        pca: PCA = pickle.load(open('TRAIN/models/preprocessing/pca.pkl', 'rb'))
-
+    # only std scaling for knn and tb
+    std : StandardScaler = pickle.load(open(f'{PATH}/preprocessing/scaler.pkl', 'rb'))
+    X = std.transform(X)
+            
+    # apply PCA for tf, rf, svm and ff
+    if clfName == "tf" or clfName == "rf" or clfName == "svm" or clfName == "ff":
+        pca: PCA = pickle.load(open(f'{PATH}/preprocessing/pca.pkl', 'rb'))
         X = pca.transform(X)
-
-    else:
-        raise ValueError("Invalid model name.")
         
     # Convert X to a DataFrame before concatenating
-    X = pd.DataFrame(X, columns=[f"PC{i+1}" for i in range(X.shape[1])])
-    y = pd.DataFrame(y, columns=["type"])
+    X = pd.DataFrame(X, columns=[f'PC{i+1}' for i in range(X.shape[1])])
+    y = pd.DataFrame(y, columns=['type'])
+
     return pd.concat([X, y], axis=1)
         
     
@@ -413,11 +403,9 @@ def preprocess(df: pd.DataFrame, clfName: str):
 def predict(df, clf):
     print(type(df))
     if isinstance(df, pd.DataFrame):
-        print("Data is a DataFrame")
         X = df.iloc[:, :-1].values  
         y = df.iloc[:, -1].values
     elif isinstance(df, np.ndarray):
-        print("Data is a Numpy Array")
         X = df[:, :-1]
         y = df[:, -1]
     else:
@@ -425,34 +413,32 @@ def predict(df, clf):
 
     
     if (isinstance(clf, TabTransformer) or isinstance(clf, FFNN)):
-        print("Predicting ")
         clf.eval()  # Set the model to evaluation mode
         with torch.no_grad():
             X_tensor = torch.tensor(X, dtype=torch.float32).to(device)
-            ypred = clf.predict(X_tensor).cpu().numpy()
-            #ypred = clf.predict(X_tensor).numpy()
+            y_pred = clf.predict(X_tensor).cpu().numpy()
+            # y_pred = clf.predict(X_tensor).numpy()
     elif (isinstance(clf, TabNet)):
-        print("Predicting with TabNet model")
-        ypred = clf.predict(X)
+        y_pred = clf.predict(X)
     else: 
-        print("Predicting with sklearn model")
-        ypred = clf.predict(X)
+        y_pred = clf.predict(X)
     
     # Calculate metrics
-    acc = accuracy_score(y, ypred)
-    bacc = float(balanced_accuracy_score(y, ypred))
-    f1 = f1_score(y, ypred, average="weighted")
+    acc = accuracy_score(y, y_pred)
+    bacc = float(balanced_accuracy_score(y, y_pred))
+    f1 = f1_score(y, y_pred, average='weighted')
 
-    return {"acc": acc, "bacc": bacc, "f1": f1}
+    return {'acc': acc, 'bacc': bacc, 'f1': f1}
     
 
 
-if __name__ == '__main__':
-    name = getName()
-    models = ["knn", "rf", "svm", "ff", "tb", "tf"]
-    data = pd.read_csv("train_dataset.csv", sep=",", low_memory=False)
-    for model in models:
-        dfProcessed = preprocess(data, model)
-        clf = load(model)
-        perf = predict(dfProcessed.values, clf)
-        print(f"{model}: {perf}") 
+# if __name__ == '__main__':
+#     name = getName()
+#     models = ['knn', 'rf', 'svm', 'ff', 'tb', 'tf']
+#     data = pd.read_csv('train_dataset.csv', sep=',', low_memory=False)
+
+#     for model in models:
+#         dfProcessed = preprocess(data, model)
+#         clf = load(model)
+#         perf = predict(dfProcessed.values, clf)
+#         print(f"{model}: {perf}") 
