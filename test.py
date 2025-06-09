@@ -216,7 +216,7 @@ class TabTransformer(torch.nn.Module):
                     loss_train /= len(data_loader)
 
                     # Compute Val Loss
-                    val_loss,_,_ = test_model(model, criterion, val_loader)
+                    val_loss, _, _ = test_model(model, criterion, val_loader)
 
                     loss_history.append(loss_train)
                     val_loss_history.append(val_loss)
@@ -299,39 +299,11 @@ class FFNN(torch.nn.Module):
                 return predictions  # Return predictions as a PyTorch tensor
 
 
-#return name and code of students
 def getName():
     return f"Filippo Brajucha: {FILIPPO_ID} \n Simone Rinaldi: {SIMONE_ID}"
 
-#load the model from the file
-def load(clfName):
-    if (clfName == "knn"):
-        clf: KNeighborsClassifier = pickle.load(open(f'{PATH}/knn/knn.pkl', 'rb'))
-        return clf
-    
-    elif (clfName == "svm"):
-        clf: SVC = pickle.load(open(f'{PATH}/svm/svm.pkl', 'rb'))
-        return clf
-    
-    elif (clfName == "rf"):
-        clf: RandomForestClassifier = pickle.load(open(f'{PATH}/rf/rf.pkl', 'rb'))
-        return clf
-    
-    elif (clfName=="tf"):
-        clf: TabTransformer = pickle.load(open(f'{PATH}/tabtransf/tabtransformer.pkl', 'rb'))
-        return clf
-    
-    elif (clfName=="tb"):
-        clf: TabNet = pickle.load(open(f'{PATH}/tabnet/tabnet.pkl', 'rb'))
-        return clf
-    
-    elif (clfName=="ff"):
-        clf: FFNN = pickle.load(open(f'{PATH}/ffnn/ffnn.pkl', 'rb'))
-        return clf
-    
-    else:
-        return None
-    
+
+
 def preprocess(df: pd.DataFrame, clfName: str):
     # 1, 2 e 3
     df = df.dropna()
@@ -367,7 +339,6 @@ def preprocess(df: pd.DataFrame, clfName: str):
     X = df.drop(columns=['type'])
     y = df['type']
 
-    # Ordinal Encoding for object and bool columns
     oe_cat: OrdinalEncoder = pickle.load(open(f'{PATH}/preprocessing/ordinal_encoder_cat.pkl', 'rb'))
     oe_bool: OrdinalEncoder = pickle.load(open(f'{PATH}/preprocessing/ordinal_encoder_bool.pkl', 'rb'))
     oe_ts: OrdinalEncoder = pickle.load(open(f'{PATH}/preprocessing/ordinal_encoder_ts.pkl', 'rb'))
@@ -379,16 +350,14 @@ def preprocess(df: pd.DataFrame, clfName: str):
 
     X = pd.get_dummies(X, columns=bool_cols)
 
-    # Label Encoding
     le: LabelEncoder = pickle.load(open(f'{PATH}/preprocessing/label_encoder.pkl', 'rb'))
     y = le.transform(y)
     
-    # only std scaling for knn and tb
     std : StandardScaler = pickle.load(open(f'{PATH}/preprocessing/scaler.pkl', 'rb'))
     X = std.transform(X)
             
-    # apply PCA for tf, rf, svm and ff
-    if clfName == "tf" or clfName == "rf" or clfName == "svm" or clfName == "ff":
+    # apply PCA for tf, svm and ff
+    if clfName in ['tf', 'svm', 'ff']:
         pca: PCA = pickle.load(open(f'{PATH}/preprocessing/pca.pkl', 'rb'))
         X = pca.transform(X)
         
@@ -397,6 +366,26 @@ def preprocess(df: pd.DataFrame, clfName: str):
     y = pd.DataFrame(y, columns=['type'])
 
     return pd.concat([X, y], axis=1)
+
+
+
+def load(clfName):
+    if(clfName in ['knn', 'svm', 'rf', 'tf', 'tb', 'ff']):
+        if (clfName == 'knn'):
+            clf: KNeighborsClassifier = pickle.load(open(f'{PATH}/knn/knn.pkl', 'rb'))
+        elif (clfName == 'svm'):
+            clf: SVC = pickle.load(open(f'{PATH}/svm/svm.pkl', 'rb'))
+        elif (clfName == 'rf'):
+            clf: RandomForestClassifier = pickle.load(open(f'{PATH}/rf/rf.pkl', 'rb'))
+        elif (clfName == 'tf'):
+            clf: TabTransformer = pickle.load(open(f'{PATH}/tabtransf/tabtransformer.pkl', 'rb'))
+        elif (clfName == 'tb'):
+            clf: TabNet = pickle.load(open(f'{PATH}/tabnet/tabnet.pkl', 'rb'))
+        elif (clfName == 'ff'):
+            clf: FFNN = pickle.load(open(f'{PATH}/ffnn/ffnn.pkl', 'rb'))
+        return clf
+    else:
+        raise ValueError(f'Unknown classifier name: {clfName}. Expected one of [knn, svm, rf, tf, tb, ff].')
         
     
 
@@ -428,7 +417,7 @@ def predict(df, clf):
     bacc = float(balanced_accuracy_score(y, y_pred))
     f1 = f1_score(y, y_pred, average='weighted')
 
-    return {'acc': acc, 'bacc': bacc, 'f1': f1}
+    return {'acc': acc, 'bacc': bacc, 'F1-score': f1}
     
 
 
